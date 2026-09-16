@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireMemberOrThrow } from "@/lib/auth/current-member";
+import type { CandidacyActionState } from "@/lib/election/action-state";
 import { prisma } from "@/lib/db/prisma";
 import {
   candidacyEditPermission,
@@ -13,12 +14,6 @@ import { countOpenCorrections } from "@/lib/election/corrections";
 import { isMemberEligible } from "@/lib/election/eligibility";
 import { findRound, getElection, serverNow } from "@/lib/election/state";
 import { candidacySchema, firstIssueMessage } from "@/lib/validation/candidacy";
-
-export interface CandidacyActionState {
-  error: string | null;
-  success: string | null;
-  candidacyId: string | null;
-}
 
 const payloadSchema = z.object({ data: candidacySchema });
 

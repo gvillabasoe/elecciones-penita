@@ -21,12 +21,16 @@ export class CandidacyError extends Error {
   }
 }
 
-export {
+import {
+  NOT_INCLUDED_LABEL,
   PROPOSAL_LABELS,
   PROPOSAL_ORDER,
-  RANGE_PROPOSAL_TYPES,
-  NOT_INCLUDED_LABEL
+  RANGE_PROPOSAL_TYPES
 } from "@/lib/election/proposal-labels";
+
+// Se importan (se usan en los mensajes de validacion) y se reexportan para
+// que el resto del codigo pueda seguir tomandolos de este modulo.
+export { NOT_INCLUDED_LABEL, PROPOSAL_LABELS, PROPOSAL_ORDER, RANGE_PROPOSAL_TYPES };
 
 const candidacyInclude = {
   president: { select: { id: true, displayName: true, slug: true } },

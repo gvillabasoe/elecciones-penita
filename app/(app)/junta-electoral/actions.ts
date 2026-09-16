@@ -5,6 +5,7 @@ import { z } from "zod";
 import type { ElectionMode } from "@prisma/client";
 import { requireBoardMemberOrThrow } from "@/lib/auth/current-member";
 import { AuthorizationError } from "@/lib/authorization/board";
+import type { BoardActionResult } from "@/lib/election/action-state";
 import { CandidacyError, deleteCandidacyAsBoard } from "@/lib/election/candidacy";
 import { CorrectionError, requestCorrection, setReviewStatus } from "@/lib/election/corrections";
 import { EligibilityError, excludeMember, reinstateMember } from "@/lib/election/eligibility";
@@ -49,11 +50,6 @@ import {
  * correspondiente y, en la capa de dominio, contra el modo real de la ronda.
  * Una acción de prueba no puede operar sobre una ronda real, ni al contrario.
  */
-
-export interface BoardActionResult {
-  error: string | null;
-  success: string | null;
-}
 
 const ok = (success: string): BoardActionResult => ({ error: null, success });
 const fail = (error: string): BoardActionResult => ({ error, success: null });

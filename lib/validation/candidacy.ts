@@ -71,6 +71,8 @@ export const reinstateSchema = z.object({
   memberId: z.string().uuid()
 });
 
+export const electionModeSchema = z.enum(["TEST", "LIVE"]);
+
 export const durationSchema = z.object({
   roundId: z.string().uuid(),
   mode: electionModeSchema,
@@ -82,8 +84,6 @@ export const resultsCountdownSchema = z.object({
   mode: electionModeSchema,
   seconds: z.coerce.number().int().min(5).max(604800)
 });
-
-export const electionModeSchema = z.enum(["TEST", "LIVE"]);
 
 /**
  * Toda accion sobre una ronda declara el modo al que dice pertenecer. La capa

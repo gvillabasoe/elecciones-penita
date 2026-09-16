@@ -1,6 +1,6 @@
 {
   "name": "elecciones-penita-2027",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "description": "Aplicacion privada para las Elecciones a la Presidencia de la Penita 2027",
   "engines": {

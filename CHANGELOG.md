@@ -3,6 +3,26 @@
 Todas las versiones relevantes de **Elecciones a la Presidencia de la Peñita 2027**.
 Formato basado en Keep a Changelog. Versionado semántico.
 
+## [0.2.1] — 2026-09-16
+
+Corrección de tres errores que impedían compilar en Vercel.
+
+### Corregido
+- `components/board/BoardAction.tsx` importaba el tipo `BoardActionState` del archivo de Server
+  Actions, que tras la 0.2.0 exportaba ese contrato con otro nombre. El tipo pasa a vivir en
+  `lib/election/action-state.ts`, fuera de los archivos `"use server"`, que solo deberían exportar
+  funciones asíncronas. `CandidacyActionState` se mueve al mismo módulo.
+- `lib/election/candidacy.ts` reexportaba `PROPOSAL_LABELS` desde `proposal-labels.ts`, pero además
+  lo usa en los mensajes de validación: un reexport no introduce el nombre en el ámbito del módulo.
+  Ahora se importa y se reexporta, así que la referencia existe en tiempo de ejecución.
+- `lib/validation/candidacy.ts` declaraba `electionModeSchema` después de `durationSchema` y
+  `resultsCountdownSchema`, que lo usan. Además de romper el tipado, habría fallado al importar el
+  módulo. La declaración se mueve arriba.
+
+### Cambiado
+- `components/candidacy/CandidacyForm.tsx` comprueba si una sección opcional tiene contenido con un
+  ayudante explícito, sin depender de la inferencia de `Object.values`.
+
 ## [0.2.0] — 2026-09-16
 
 Actualización estructural del sistema electoral. Sustituye requisitos anteriores incompatibles.
