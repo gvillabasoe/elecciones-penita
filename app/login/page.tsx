@@ -1,19 +1,35 @@
 import { redirect } from "next/navigation";
 import { LoginForm } from "@/components/auth/LoginForm";
+import { SetupNotice } from "@/components/system/SetupNotice";
 import { getCurrentMember } from "@/lib/auth/current-member";
 import { prisma } from "@/lib/db/prisma";
+import { collectDiagnostics } from "@/lib/system/diagnostics";
 
 export const dynamic = "force-dynamic";
 
 export default async function LoginPage() {
-  const member = await getCurrentMember();
-  if (member) redirect("/eleccion");
+  let member = null;
+  let members: { slug: string; displayName: string }[] = [];
+  let failed = false;
 
-  const members = await prisma.member.findMany({
-    where: { isActive: true },
-    orderBy: { sortOrder: "asc" },
-    select: { slug: true, displayName: true }
-  });
+  // Si la base de datos o la configuración fallan, se explica en lugar de
+  // devolver un error de servidor sin pistas.
+  try {
+    member = await getCurrentMember();
+    members = await prisma.member.findMany({
+      where: { isActive: true },
+      orderBy: { sortOrder: "asc" },
+      select: { slug: true, displayName: true }
+    });
+  } catch {
+    failed = true;
+  }
+
+  if (failed) {
+    return <SetupNotice diagnostics={await collectDiagnostics()} />;
+  }
+
+  if (member) redirect("/eleccion");
 
   return (
     <div className="app-shell">
