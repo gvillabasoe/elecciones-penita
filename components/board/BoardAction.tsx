@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import type { BoardActionState } from "@/app/(app)/junta-electoral/actions";
+import type { BoardActionState } from "@/lib/election/action-state";
 
 const VACIO: BoardActionState = { error: null, success: null };
 

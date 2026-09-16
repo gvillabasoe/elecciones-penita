@@ -80,18 +80,22 @@ export function CandidacyForm({ presidentName, initial, redirectTo }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
+  /** Comprueba si una seccion tiene algo escrito, sea cual sea su forma. */
+  const hasText = (values: object): boolean =>
+    Object.values(values).some((value) => typeof value === "string" && value.trim().length > 0);
+
   const sectionHasData = (key: OptionalKey): boolean => {
     switch (key) {
       case "party":
-        return Object.values(party).some((value) => value.trim().length > 0);
+        return hasText(party);
       case "event":
-        return Object.values(event).some((value) => value.trim().length > 0);
+        return hasText(event);
       case "ruralHouse":
-        return Object.values(ruralHouse).some((value) => value.trim().length > 0);
+        return hasText(ruralHouse);
       case "trip":
-        return Object.values(trip).some((value) => value.trim().length > 0);
+        return hasText(trip);
       case "weekendGetaway":
-        return Object.values(weekend).some((value) => value.trim().length > 0);
+        return hasText(weekend);
       case "promises":
         return promises.some((value) => value.trim().length > 0);
       default:
