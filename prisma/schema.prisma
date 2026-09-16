@@ -1,0 +1,424 @@
+// ---------------------------------------------------------------------------
+// Elecciones a la Presidencia de la Penita 2027
+// Esquema Prisma. PostgreSQL (Neon).
+//
+// Principios del modelo:
+//  - Cada miembro elegible aparece EXACTAMENTE UNA VEZ en la papeleta de cada
+//    ronda. Una candidatura no es una opcion de voto independiente: enriquece
+//    la opcion de su presidente.
+//  - Las papeletas (Ballot) no guardan ninguna referencia al votante.
+//  - La participacion (VotingParticipation) solo existe para impedir el
+//    segundo voto y no guarda la opcion elegida.
+//  - Las opciones de papeleta se congelan al iniciar cada ronda.
+//  - Toda entidad operativa pertenece a una ronda con modo TEST o LIVE. Los
+//    datos de prueba y los reales nunca se mezclan.
+//  - Los instantes criticos los genera PostgreSQL, nunca el cliente.
+// ---------------------------------------------------------------------------
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ------------------------------- Enums -------------------------------------
+
+enum Role {
+  MEMBER
+  PRESIDENT
+  HONORARY_PRESIDENT
+}
+
+/// Separacion estricta entre ensayo y eleccion real.
+enum ElectionMode {
+  TEST
+  LIVE
+}
+
+enum RoundStatus {
+  READY_TO_START
+  VOTING_OPEN
+  VOTING_CLOSED
+  RESULTS_WAITING
+  RESULTS_REVEALING
+  RESULTS_PUBLISHED
+}
+
+enum ResultsRevealStage {
+  HIDDEN
+  LOWER_RANKS_REVEALED
+  FOURTH_FIFTH_REVEALED
+  PODIUM_REVEALED
+}
+
+enum ExclusionReason {
+  PREVIOUS_PRESIDENT
+  ABSENT_CHRISTMAS_DINNER
+}
+
+enum ProposalType {
+  ANNUAL_GROUP_PLAN
+  SEMANA_GRANDE_DINNER
+  CHRISTMAS_DINNER
+  PARTY
+  EVENT
+  RURAL_HOUSE
+  TRIP
+  WEEKEND_GETAWAY
+}
+
+/// Revision de la Junta Electoral. La Junta no edita el contenido: lo solicita.
+enum CandidacyReviewStatus {
+  PENDING_REVIEW
+  VALID
+  CORRECTION_REQUESTED
+  INVALID
+}
+
+enum CorrectionRequestStatus {
+  OPEN
+  RESOLVED
+}
+
+enum AuditAction {
+  CANDIDACY_DEADLINE_UPDATED
+  CANDIDACY_CREATED
+  CANDIDACY_UPDATED_BY_BOARD
+  CANDIDACY_DELETED
+  MEMBER_EXCLUDED
+  MEMBER_REINSTATED
+  VOTING_DURATION_CONFIGURED
+  VOTING_STARTED
+  VOTING_CLOSED_MANUALLY
+  RESULTS_COUNTDOWN_STARTED
+  LOWER_RESULTS_REVEALED
+  FOURTH_FIFTH_REVEALED
+  PODIUM_REVEALED
+  RUNOFF_CREATED
+  ROUND_RESET
+  CORRECTION_REQUESTED
+  CORRECTION_RESOLVED
+  CANDIDACY_MARKED_VALID
+  CANDIDACY_MARKED_INVALID
+  SIMULATION_RESET
+  SIMULATION_FINISHED
+}
+
+// ------------------------------- Modelos -----------------------------------
+
+model Member {
+  id             String   @id @default(uuid()) @db.Uuid
+  slug           String   @unique
+  displayName    String
+  normalizedName String
+  sortOrder      Int      @unique
+  passwordHash   String
+  role           Role     @default(MEMBER)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  eligibilities        ElectionEligibility[] @relation("EligibilityMember")
+  exclusionsPerformed  ElectionEligibility[] @relation("EligibilityExcludedBy")
+  reinstatesPerformed  ElectionEligibility[] @relation("EligibilityReinstatedBy")
+  candidacies          Candidacy[]           @relation("CandidacyPresident")
+  candidaciesDeleted   Candidacy[]           @relation("CandidacyDeletedBy")
+  participations       VotingParticipation[]
+  ballotOptions        RoundBallotOption[]
+  roundsStarted        ElectionRound[]       @relation("RoundStartedBy")
+  roundsClosed         ElectionRound[]       @relation("RoundClosedBy")
+  lowerRevealsDone     ElectionRound[]       @relation("RoundLowerRevealedBy")
+  fourthFifthRevealed  ElectionRound[]       @relation("RoundFourthFifthRevealedBy")
+  podiumRevealsDone    ElectionRound[]       @relation("RoundPodiumRevealedBy")
+  auditEntries         ElectionAuditLog[]
+  loginAttempts        LoginAttempt[]
+  correctionsRequested CandidacyCorrectionRequest[] @relation("CorrectionRequestedBy")
+  correctionsResolved  CandidacyCorrectionRequest[] @relation("CorrectionResolvedBy")
+
+  @@index([normalizedName])
+  @@index([sortOrder])
+}
+
+model Election {
+  id                    String       @id @default(uuid()) @db.Uuid
+  name                  String
+  slug                  String       @unique
+  mode                  ElectionMode @default(LIVE)
+  candidacyEditDeadline DateTime?
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+
+  rounds        ElectionRound[]
+  eligibilities ElectionEligibility[]
+  candidacies   Candidacy[]
+  auditEntries  ElectionAuditLog[]
+
+  @@index([mode])
+}
+
+model ElectionRound {
+  id            String       @id @default(uuid()) @db.Uuid
+  electionId    String       @db.Uuid
+  /// Denormalizado y inmutable: garantiza que ninguna consulta mezcle modos.
+  mode          ElectionMode @default(LIVE)
+  roundNumber   Int
+  sourceRoundId String?      @unique @db.Uuid
+
+  status                RoundStatus @default(READY_TO_START)
+  votingDurationSeconds Int?
+  votingOpenedAt        DateTime?
+  votingClosesAt        DateTime?
+  votingClosedAt        DateTime?
+
+  votingStartedByMemberId String? @db.Uuid
+  votingClosedByMemberId  String? @db.Uuid
+
+  resultsCountdownDurationSeconds Int?
+  resultsCountdownStartedAt       DateTime?
+  resultsRevealAt                 DateTime?
+
+  resultsRevealStage             ResultsRevealStage @default(HIDDEN)
+  lowerResultsRevealedAt         DateTime?
+  lowerResultsRevealedByMemberId String?            @db.Uuid
+  fourthFifthRevealedAt          DateTime?
+  fourthFifthRevealedByMemberId  String?            @db.Uuid
+  podiumRevealedAt               DateTime?
+  podiumRevealedByMemberId       String?            @db.Uuid
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  election    Election       @relation(fields: [electionId], references: [id], onDelete: Cascade)
+  sourceRound ElectionRound? @relation("RoundLineage", fields: [sourceRoundId], references: [id])
+  runoffRound ElectionRound? @relation("RoundLineage")
+
+  startedBy             Member? @relation("RoundStartedBy", fields: [votingStartedByMemberId], references: [id])
+  closedBy              Member? @relation("RoundClosedBy", fields: [votingClosedByMemberId], references: [id])
+  lowerRevealedBy       Member? @relation("RoundLowerRevealedBy", fields: [lowerResultsRevealedByMemberId], references: [id])
+  fourthFifthRevealedBy Member? @relation("RoundFourthFifthRevealedBy", fields: [fourthFifthRevealedByMemberId], references: [id])
+  podiumRevealedBy      Member? @relation("RoundPodiumRevealedBy", fields: [podiumRevealedByMemberId], references: [id])
+
+  ballotOptions  RoundBallotOption[]
+  participations VotingParticipation[]
+  ballots        Ballot[]
+  auditEntries   ElectionAuditLog[]
+
+  @@unique([electionId, roundNumber])
+  @@index([electionId, status])
+  @@index([electionId, mode])
+  @@index([mode, status])
+  @@index([resultsRevealStage])
+}
+
+model ElectionEligibility {
+  id         String  @id @default(uuid()) @db.Uuid
+  electionId String  @db.Uuid
+  memberId   String  @db.Uuid
+  isEligible Boolean @default(true)
+
+  excludedByMemberId   String?   @db.Uuid
+  excludedAt           DateTime?
+  reinstatedByMemberId String?   @db.Uuid
+  reinstatedAt         DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  election     Election @relation(fields: [electionId], references: [id], onDelete: Cascade)
+  member       Member   @relation("EligibilityMember", fields: [memberId], references: [id], onDelete: Cascade)
+  excludedBy   Member?  @relation("EligibilityExcludedBy", fields: [excludedByMemberId], references: [id])
+  reinstatedBy Member?  @relation("EligibilityReinstatedBy", fields: [reinstatedByMemberId], references: [id])
+
+  reasons ElectionExclusionReason[]
+
+  @@unique([electionId, memberId])
+  @@index([electionId, isEligible])
+}
+
+model ElectionExclusionReason {
+  id            String          @id @default(uuid()) @db.Uuid
+  eligibilityId String          @db.Uuid
+  reason        ExclusionReason
+  createdAt     DateTime        @default(now())
+
+  eligibility ElectionEligibility @relation(fields: [eligibilityId], references: [id], onDelete: Cascade)
+
+  @@unique([eligibilityId, reason])
+}
+
+model Candidacy {
+  id          String @id @default(uuid()) @db.Uuid
+  electionId  String @db.Uuid
+  presidentId String @db.Uuid
+
+  name        String
+  slogan      String
+  pastelColor String
+
+  reviewStatus CandidacyReviewStatus @default(PENDING_REVIEW)
+
+  isDeleted         Boolean   @default(false)
+  deletedAt         DateTime?
+  deletedByMemberId String?   @db.Uuid
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  election  Election @relation(fields: [electionId], references: [id], onDelete: Cascade)
+  president Member   @relation("CandidacyPresident", fields: [presidentId], references: [id])
+  deletedBy Member?  @relation("CandidacyDeletedBy", fields: [deletedByMemberId], references: [id])
+
+  proposals          CandidacyProposal[]
+  promises           CandidacyPromise[]
+  ballotOptions      RoundBallotOption[]
+  correctionRequests CandidacyCorrectionRequest[]
+
+  @@index([electionId, isDeleted])
+  @@index([electionId, isDeleted, reviewStatus])
+}
+
+model CandidacyProposal {
+  id          String       @id @default(uuid()) @db.Uuid
+  candidacyId String       @db.Uuid
+  type        ProposalType
+  title       String?
+  place       String
+  startDate   DateTime?    @db.Date
+  endDate     DateTime?    @db.Date
+  description String
+  sortOrder   Int
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  candidacy Candidacy @relation(fields: [candidacyId], references: [id], onDelete: Cascade)
+
+  @@unique([candidacyId, type])
+  @@index([candidacyId, sortOrder])
+}
+
+model CandidacyPromise {
+  id          String   @id @default(uuid()) @db.Uuid
+  candidacyId String   @db.Uuid
+  text        String
+  sortOrder   Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  candidacy Candidacy @relation(fields: [candidacyId], references: [id], onDelete: Cascade)
+
+  @@unique([candidacyId, sortOrder])
+  @@index([candidacyId])
+}
+
+/// Solicitud de correccion. La Junta no edita el contenido del candidato:
+/// indica el motivo y el propio candidato realiza el cambio.
+model CandidacyCorrectionRequest {
+  id                   String                  @id @default(uuid()) @db.Uuid
+  candidacyId          String                  @db.Uuid
+  requestedByMemberId  String                  @db.Uuid
+  reason               String
+  status               CorrectionRequestStatus @default(OPEN)
+  createdAt            DateTime                @default(now())
+  resolvedAt           DateTime?
+  resolvedByMemberId   String?                 @db.Uuid
+
+  candidacy   Candidacy @relation(fields: [candidacyId], references: [id], onDelete: Cascade)
+  requestedBy Member    @relation("CorrectionRequestedBy", fields: [requestedByMemberId], references: [id])
+  resolvedBy  Member?   @relation("CorrectionResolvedBy", fields: [resolvedByMemberId], references: [id])
+
+  @@index([candidacyId, status])
+  @@index([status, createdAt])
+}
+
+/// Opcion congelada de la papeleta: EXACTAMENTE UNA POR MIEMBRO Y RONDA.
+/// La candidatura, si existe, enriquece la opcion de su presidente y nunca
+/// genera una opcion adicional.
+model RoundBallotOption {
+  id                         String  @id @default(uuid()) @db.Uuid
+  roundId                    String  @db.Uuid
+  sourceMemberId             String  @db.Uuid
+  sourceCandidacyId          String? @db.Uuid
+  memberNameSnapshot         String
+  candidacyNameSnapshot      String?
+  sloganSnapshot             String?
+  colorSnapshot              String
+  hasFormalCandidacySnapshot Boolean @default(false)
+  sortOrder                  Int
+
+  round           ElectionRound @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  sourceMember    Member        @relation(fields: [sourceMemberId], references: [id])
+  sourceCandidacy Candidacy?    @relation(fields: [sourceCandidacyId], references: [id])
+
+  ballots Ballot[]
+
+  @@unique([roundId, sourceMemberId])
+  @@unique([roundId, sourceCandidacyId])
+  @@unique([roundId, sortOrder])
+  @@index([roundId])
+  @@index([sourceMemberId])
+}
+
+/// Registro de participacion. Unica finalidad: impedir un segundo voto.
+/// No contiene la opcion votada ni marca temporal.
+model VotingParticipation {
+  id       String @id @default(uuid()) @db.Uuid
+  roundId  String @db.Uuid
+  memberId String @db.Uuid
+
+  round  ElectionRound @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  member Member        @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([roundId, memberId])
+  @@index([roundId])
+  @@index([memberId, roundId])
+}
+
+/// Papeleta anonima. No contiene votante, sesion, IP, user agent ni timestamp.
+model Ballot {
+  id             String @id @default(uuid()) @db.Uuid
+  roundId        String @db.Uuid
+  ballotOptionId String @db.Uuid
+
+  round        ElectionRound     @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  ballotOption RoundBallotOption @relation(fields: [ballotOptionId], references: [id])
+
+  @@index([roundId, ballotOptionId])
+}
+
+model ElectionAuditLog {
+  id            String      @id @default(uuid()) @db.Uuid
+  electionId    String      @db.Uuid
+  roundId       String?     @db.Uuid
+  actorMemberId String      @db.Uuid
+  action        AuditAction
+  entityType    String
+  entityId      String?
+  metadata      Json?
+  createdAt     DateTime    @default(now())
+
+  election Election       @relation(fields: [electionId], references: [id], onDelete: Cascade)
+  round    ElectionRound? @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  actor    Member         @relation(fields: [actorMemberId], references: [id])
+
+  @@index([electionId, createdAt])
+  @@index([roundId, createdAt])
+  @@index([electionId, action, createdAt])
+  @@index([actorMemberId, createdAt])
+}
+
+/// Rate limiting de inicio de sesion. No almacena IP ni user agent.
+model LoginAttempt {
+  id        String   @id @default(uuid()) @db.Uuid
+  slugKey   String
+  memberId  String?  @db.Uuid
+  success   Boolean
+  createdAt DateTime @default(now())
+
+  member Member? @relation(fields: [memberId], references: [id], onDelete: SetNull)
+
+  @@index([slugKey, createdAt])
+}

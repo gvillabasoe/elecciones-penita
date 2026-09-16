@@ -1,0 +1,19 @@
+{
+  "name": "Elecciones a la Presidencia de la Peñita 2027",
+  "short_name": "Elecciones Peñita",
+  "description": "Aplicación privada de la Peñita para presentar candidaturas y votar a la presidencia.",
+  "lang": "es",
+  "start_url": "/votar",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FFFFFF",
+  "theme_color": "#FFFFFF",
+  "icons": [
+    {
+      "src": "/icono.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
