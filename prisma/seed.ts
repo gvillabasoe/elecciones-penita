@@ -17,6 +17,9 @@ import { normalizeName } from "../lib/validation/normalize";
  * Seed de la aplicacion.
  *
  * Las contrasenas iniciales NO viven en el repositorio. Este script lee un
+ * La misma carga existe en lib/system/install.ts, para la instalacion desde el
+ * navegador. Si cambias una, cambia la otra.
+ *
  * archivo JSON externo (por defecto prisma/credentials.local.json, ignorado
  * por git), calcula el hash bcrypt y descarta inmediatamente el texto plano.
  *

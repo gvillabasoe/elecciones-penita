@@ -8,7 +8,7 @@ import type { Diagnostics } from "@/lib/system/diagnostics";
  * cadena de conexion ni el mensaje original del error.
  */
 export function SetupNotice({ diagnostics }: { diagnostics: Diagnostics }) {
-  const { env, database, schema, seed, failure, problems } = diagnostics;
+  const { env, database, schema, seed, failure, problems, warnings } = diagnostics;
 
   const marca = (ok: boolean) => (
     <span className={ok ? "chip chip--activo" : "chip chip--excluido"}>{ok ? "correcto" : "falta"}</span>
@@ -47,6 +47,36 @@ export function SetupNotice({ diagnostics }: { diagnostics: Diagnostics }) {
               Después de cambiar variables de entorno en Vercel hay que volver a desplegar: se leen al
               arrancar la función, no en cada petición.
             </p>
+            <p className="texto-secundario" style={{ margin: 0 }}>
+              Si no puedes ejecutar comandos en tu ordenador, los pasos 2 y 3 se pueden hacer desde{" "}
+              <a href="/instalacion">/instalacion</a>.
+            </p>
+          </section>
+        ) : null}
+
+        {warnings.length > 0 ? (
+          <section className="solido tarjeta stack stack--s">
+            <h2 style={{ margin: 0 }}>Avisos</h2>
+            <ul style={{ margin: 0, paddingLeft: "1.1rem" }}>
+              {warnings.map((warning) => (
+                <li key={warning} className="texto-secundario">
+                  {warning}
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+
+        {schema.tablesFound === schema.tablesExpected && seed.members === 0 ? (
+          <section className="solido tarjeta stack stack--s">
+            <h2 style={{ margin: 0 }}>Instalación desde el navegador</h2>
+            <p style={{ margin: 0 }}>
+              Las tablas ya existen. Puedes cargar los miembros sin entorno local desde la página de
+              instalación, protegida por la variable SETUP_TOKEN.
+            </p>
+            <a className="btn btn--principal btn--bloque" href="/instalacion">
+              Ir a la instalación
+            </a>
           </section>
         ) : null}
 
@@ -58,7 +88,7 @@ export function SetupNotice({ diagnostics }: { diagnostics: Diagnostics }) {
               {marca(env.databaseUrl)}
             </li>
             <li className="fila fila--separada">
-              <span>DIRECT_URL definida</span>
+              <span>DIRECT_URL definida (solo para migrar)</span>
               {marca(env.directUrl)}
             </li>
             <li className="fila fila--separada">
