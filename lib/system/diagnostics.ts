@@ -102,7 +102,10 @@ export interface Diagnostics {
   seed: { members: number; liveElection: boolean; testElection: boolean; firstRound: boolean };
   failure: Failure | null;
   ready: boolean;
+  /** Impiden funcionar. */
   problems: string[];
+  /** Conviene resolverlos, pero la aplicación funciona. */
+  warnings: string[];
 }
 
 const EXPECTED_TABLES = [
@@ -133,7 +136,8 @@ export async function collectDiagnostics(): Promise<Diagnostics> {
     seed: { members: 0, liveElection: false, testElection: false, firstRound: false },
     failure: null,
     ready: false,
-    problems: []
+    problems: [],
+    warnings: []
   };
 
   if (!diagnostics.env.databaseUrl) {
@@ -177,7 +181,13 @@ export async function collectDiagnostics(): Promise<Diagnostics> {
   }
 
   if (!diagnostics.env.databaseUrl) diagnostics.problems.push("Define DATABASE_URL en el entorno.");
-  if (!diagnostics.env.directUrl) diagnostics.problems.push("Define DIRECT_URL para poder migrar.");
+  if (!diagnostics.env.directUrl) {
+    // La aplicación no la usa en runtime: solo hace falta para migrar con la
+    // CLI de Prisma. No bloquea el funcionamiento.
+    diagnostics.warnings.push(
+      "DIRECT_URL no está definida. Solo la necesitas si migras con la CLI de Prisma."
+    );
+  }
   if (!diagnostics.env.authSecret) diagnostics.problems.push("Define AUTH_SECRET: sin él no se puede iniciar sesión.");
   else if (!diagnostics.env.authSecretLongEnough) {
     diagnostics.problems.push("AUTH_SECRET debe tener al menos 32 caracteres.");
@@ -186,7 +196,9 @@ export async function collectDiagnostics(): Promise<Diagnostics> {
     diagnostics.problems.push("Aplica las migraciones: npm run prisma:deploy.");
   }
   if (diagnostics.schema.tablesFound === EXPECTED_TABLES.length && diagnostics.seed.members === 0) {
-    diagnostics.problems.push("Ejecuta el seed: npm run seed.");
+    diagnostics.problems.push(
+      "Carga los miembros: npm run seed, o abre /instalacion si prefieres hacerlo desde el navegador."
+    );
   }
   if (diagnostics.seed.members > 0 && !diagnostics.seed.firstRound) {
     diagnostics.problems.push("La elección real no tiene primera vuelta: vuelve a ejecutar el seed.");

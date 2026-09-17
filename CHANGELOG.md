@@ -3,6 +3,78 @@
 Todas las versiones relevantes de **Elecciones a la Presidencia de la Peñita 2027**.
 Formato basado en Keep a Changelog. Versionado semántico.
 
+## [0.3.0] — 2026-09-16
+
+Puesta en marcha sin línea de comandos.
+
+### Añadido
+- Ruta `/instalacion`: crea el esquema y carga los 39 miembros y las dos elecciones desde el
+  navegador. Protegida por la variable `SETUP_TOKEN` (mínimo 24 caracteres), con comparación del
+  token en tiempo constante y en servidor. La carga inicial solo funciona con la tabla de miembros
+  vacía.
+- Puede generar contraseñas aleatorias y mostrarlas una única vez, o aceptar un JSON con las 39.
+  En base de datos solo se guarda el hash bcrypt; las generadas no se almacenan.
+- `scripts/build-install-sql.mjs` y `npm run build:install-sql`: convierten las migraciones en un
+  módulo ejecutable, partiendo el SQL en sentencias con respeto a cadenas, comentarios y bloques
+  `$$`, y calculando el checksum SHA-256 que usa el motor de migraciones. La instalación registra
+  las migraciones en `_prisma_migrations`, así que `prisma migrate deploy` las ve aplicadas.
+- `/estado` genera valores aleatorios de `AUTH_SECRET` y `SETUP_TOKEN` listos para copiar, para no
+  depender de una terminal, y enlaza con la instalación.
+- Nueva variable de entorno documentada: `SETUP_TOKEN`.
+
+### Notas
+- La instalación usa `DIRECT_URL` cuando existe: los disparadores y bloqueos no funcionan de forma
+  fiable a través del pooler.
+- El paso de carga tarda entre 20 y 60 segundos (39 hashes bcrypt de coste 12), por lo que la página
+  declara `maxDuration = 60`.
+- La lógica de carga está duplicada a propósito en `prisma/seed.ts` (CLI) y `lib/system/install.ts`
+  (navegador); ambos archivos se refieren al otro.
+
+## [0.3.0] — 2026-09-17
+
+Instalación completa desde el navegador, para poder poner en marcha la aplicación sin entorno local.
+
+### Añadido
+- `/instalacion`: dos pasos, crear el esquema y cargar los datos iniciales. Deshabilitada mientras
+  no exista `SETUP_TOKEN`; el token se compara en tiempo constante; el segundo paso exige que la
+  tabla de miembros esté vacía, de modo que nunca puede reescribir contraseñas en uso.
+- `lib/system/install-schema.ts`: ejecuta las migraciones desde la aplicación, cada una en su propia
+  transacción, y las registra en `_prisma_migrations` con su checksum real para que
+  `prisma migrate deploy` no intente repetirlas.
+- `lib/system/install.ts`: creación de los 39 miembros, las dos elecciones y el censo, con
+  contraseñas aleatorias (mostradas una única vez) o escritas a mano en JSON. Los hashes se calculan
+  fuera de la transacción: bcrypt de coste 12 son decenas de segundos de CPU.
+- `scripts/build-install-sql.mjs` y `npm run build:install-sql`: generan desde `prisma/migrations`
+  tanto `prisma/instalacion-neon.sql` (para el editor SQL de Neon) como el módulo con las sentencias
+  que usa la aplicación. El separador de sentencias respeta los bloques `$$`, así que las funciones
+  y los disparadores no se parten.
+
+### Cambiado
+- `DIRECT_URL` pasa de requisito a aviso en el diagnóstico: la aplicación no la usa en ejecución,
+  solo hace falta para migrar con la CLI de Prisma.
+- La pantalla de puesta en marcha propone `/instalacion` cuando las tablas existen pero no hay
+  miembros.
+
+## [0.2.2] — 2026-09-16
+
+Un fallo de configuración ya no produce una pantalla en blanco.
+
+### Cambiado
+- `lib/db/prisma.ts` construye el cliente en el primer uso, no al importar el módulo. Con la
+  construcción inmediata, la falta de `DATABASE_URL` tumbaba cualquier página antes de que se
+  pudiera capturar el error y explicarlo.
+- `/` y `/login` capturan los fallos de configuración o de base de datos y muestran la pantalla de
+  puesta en marcha en lugar de devolver un error de servidor.
+
+### Añadido
+- `lib/system/diagnostics.ts`: comprueba variables de entorno (solo si están definidas, nunca su
+  valor), conexión, tablas, migraciones aplicadas y seed, y clasifica el error sin exponer su
+  mensaje original, que puede contener host, usuario o base de datos.
+- `components/system/SetupNotice.tsx` y la ruta `/estado`: qué falta y en qué orden resolverlo.
+- `app/error.tsx` y `app/global-error.tsx`: fronteras de error con el identificador del fallo, un
+  botón de reintento y enlace a `/estado`.
+- README, apartado 31: guía de arranque en producción con las causas más frecuentes.
+
 ## [0.2.1] — 2026-09-16
 
 Corrección de tres errores que impedían compilar en Vercel.

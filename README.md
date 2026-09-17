@@ -69,6 +69,9 @@ No se usa Firebase, Supabase, MongoDB, almacenamiento en memoria ni `localStorag
 /junta-electoral/pruebas/resultados Ensayo de resultados con datos ficticios
 /api/election-status                Estado ligero para el refresco (solo LIVE)
 /api/participation                  Participación agregada (4 campos)
+/estado                             Estado de la instalación (puesta en marcha)
+/instalacion                        Instalación sin entorno local (requiere SETUP_TOKEN)
+/instalacion                        Instalación desde el navegador (con SETUP_TOKEN)
 ```
 
 Navegación principal: **Elección** y **Candidatura** para todos; **Junta Electoral** como tercera
@@ -118,6 +121,7 @@ Copia `.env.example` como `.env` y rellena los valores:
 | `LOGIN_RATE_LIMIT_WINDOW_SECONDS` | No | Ventana del límite. Por defecto 900 |
 | `BCRYPT_COST` | No | Coste de bcrypt. Por defecto 12 |
 | `SEED_CREDENTIALS_FILE` | Solo para el seed | Ruta al archivo de credenciales iniciales |
+| `SETUP_TOKEN` | Solo para instalar | Contraseña de `/instalacion`, mínimo 24 caracteres. Bórrala al terminar |
 
 ```bash
 node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
@@ -142,7 +146,36 @@ ensayo (`TEST`), cada una con su primera vuelta en estado pendiente de iniciar y
 idempotente y nunca imprime ni almacena contraseñas en claro. Borra
 `prisma/credentials.local.json` cuando termines.
 
-## 8. Migraciones
+## 8. Instalación sin línea de comandos
+
+Si no puedes ejecutar nada en tu ordenador, la aplicación se instala desde el navegador. Hace lo
+mismo que los comandos del apartado 7: ejecuta el SQL de las tres migraciones y las registra en
+`_prisma_migrations` con su checksum real, de modo que un futuro `prisma migrate deploy` las
+considere aplicadas.
+
+1. Define en el entorno `DATABASE_URL`, `DIRECT_URL`, `AUTH_SECRET` y una variable nueva
+   **`SETUP_TOKEN`** con al menos 24 caracteres: es la contraseña de la página de instalación.
+   Si no tienes terminal, `/estado` genera valores aleatorios listos para copiar.
+2. Vuelve a desplegar. Las variables se leen al arrancar la función.
+3. Abre **`/instalacion`**, escribe el `SETUP_TOKEN` y pulsa **Crear el esquema**.
+4. Pulsa **Cargar miembros y elecciones**. Puedes generar contraseñas aleatorias, que se muestran
+   una única vez para copiarlas, o escribirlas tú en el cuadro de texto.
+5. Borra `SETUP_TOKEN` y vuelve a desplegar: la página queda inservible.
+
+Salvaguardas:
+
+- Las acciones comprueban el token en servidor con comparación en tiempo constante.
+- Sin `SETUP_TOKEN` definido, la página no puede hacer nada.
+- La carga inicial **solo funciona con la tabla de miembros vacía**: nadie puede reescribir las
+  contraseñas de la Peñita desde ahí.
+- Se usa la conexión `DIRECT_URL` cuando existe, porque los disparadores no se crean de forma fiable
+  a través del pooler.
+- De las contraseñas solo se guarda el hash bcrypt. Las generadas no se almacenan en ningún sitio.
+
+El SQL embebido se genera desde las migraciones con `npm run build:install-sql`. Si añades una
+migración, ejecútalo para que la instalación por navegador siga estando completa.
+
+## 9. Migraciones
 
 1. `20260916120000_init`: tablas, índices y claves ajenas.
 2. `20260916120100_election_integrity`: restricciones y disparadores que Prisma no expresa.
@@ -503,7 +536,60 @@ públicos. Cambia a contraseñas aleatorias en cuanto todos hayan entrado por pr
 5. Aplica las migraciones contra Neon con `npm run prisma:deploy` y `DIRECT_URL` de producción.
 6. Ejecuta el seed una sola vez, desde tu máquina y con el archivo de credenciales local.
 
-## 31. Problemas comunes
+## 31. Instalación sin entorno local
+
+Si no quieres instalar nada en tu ordenador, la aplicación puede crear su propio esquema y cargar
+los miembros desde el navegador. Está deshabilitado por defecto.
+
+1. En Vercel, además de `DATABASE_URL`, define `AUTH_SECRET` (32 caracteres o más) y `SETUP_TOKEN`
+   (16 o más, un valor cualquiera que solo conozcas tú). Vuelve a desplegar: las variables se leen
+   al arrancar la función.
+2. Abre `/instalacion`, escribe el `SETUP_TOKEN` y pulsa **Crear el esquema**. Ejecuta las mismas
+   migraciones que `prisma migrate deploy` y las registra en `_prisma_migrations` con su checksum
+   real, así que la CLI de Prisma las considerará aplicadas. Cada migración va en su propia
+   transacción y el paso se puede repetir sin efectos.
+3. Pulsa **Cargar miembros y elecciones**. Puedes generar contraseñas aleatorias —se muestran una
+   única vez— o escribirlas tú. Tarda entre 20 y 60 segundos: son 39 hashes bcrypt.
+4. Borra `SETUP_TOKEN` y vuelve a desplegar. La página queda deshabilitada.
+
+Garantías de esa página:
+
+- Sin `SETUP_TOKEN` no hace nada, y el token se compara en tiempo constante.
+- El paso 2 solo se ejecuta con la tabla de miembros **vacía**: nunca puede reescribir las
+  contraseñas de la Peñita ni tocar una elección en marcha.
+- Las contraseñas generadas se devuelven una sola vez en esa respuesta; en base de datos solo hay
+  hashes bcrypt, y no se registran en logs ni en la auditoría.
+
+**Alternativa sin la aplicación:** `prisma/instalacion-neon.sql` es el mismo esquema en un único
+script para pegar en el editor SQL de Neon. Se regenera con `npm run build:install-sql` y queda
+siempre sincronizado con `prisma/migrations`.
+
+## 32. Si la aplicación despliega pero da error de servidor
+
+Una pantalla blanca con *"Application error: a server-side exception has occurred"* casi siempre es
+configuración, no código. Abre **`/estado`**: dice exactamente qué falta sin mostrar ningún valor de
+configuración.
+
+Causas, por frecuencia:
+
+| Síntoma en `/estado` | Causa | Solución |
+|---|---|---|
+| `DATABASE_URL` marca "falta" | La variable no está en el entorno del despliegue | Añádela en Vercel y **vuelve a desplegar**: las variables se leen al arrancar la función |
+| Base de datos accesible, 0 tablas | Migraciones sin aplicar | `npm run prisma:deploy` con `DIRECT_URL` de producción |
+| 9 de 9 tablas, 0 miembros | Seed sin ejecutar | `npm run seed` con `prisma/credentials.local.json` |
+| "No se ha podido conectar" | Cadena sin pooling, sin `?sslmode=require`, o proyecto de Neon suspendido | Vuelve a copiar la cadena desde Neon |
+| "Credenciales rechazadas" | Usuario o contraseña incorrectos en la cadena | Regenera la contraseña en Neon |
+| Todo correcto pero falla al entrar | `AUTH_SECRET` ausente o de menos de 32 caracteres | Genera uno nuevo y vuelve a desplegar |
+
+Para ver el error original, en Vercel: **Deployment → Runtime Logs**, y busca el identificador
+(*digest*) que muestra la pantalla de error.
+
+Detalles de diseño relacionados: el cliente de Prisma se construye en el primer uso, no al importar
+el módulo, para que un fallo de configuración pueda explicarse en pantalla en lugar de tumbar la
+página; y `/`, `/login`, `app/error.tsx` y `app/global-error.tsx` degradan con un mensaje útil.
+Puedes borrar `app/estado` cuando la aplicación ya funcione.
+
+## 33. Problemas comunes
 
 | Síntoma | Causa y solución |
 |---|---|
@@ -519,7 +605,7 @@ públicos. Cambia a contraseñas aleatorias en cuanto todos hayan entrado por pr
 | `AUTH_SECRET` demasiado corto | Genera uno de al menos 32 caracteres |
 | `Demasiados intentos` al entrar | Límite de intentos: espera la ventana configurada |
 
-## 32. Checklist de entrega
+## 34. Checklist de entrega
 
 - [x] Una opción por miembro
 - [x] Candidatura integrada
@@ -545,7 +631,7 @@ públicos. Cambia a contraseñas aleatorias en cuanto todos hayan entrado por pr
 - [x] Pruebas actualizadas
 - [x] Requisitos incompatibles eliminados
 
-## 33. Versionado y privacidad
+## 35. Versionado y privacidad
 
 Versionado semántico; la versión vive en `package.json`, `CHANGELOG.md` y el nombre del ZIP de
 entrega. Aplicación privada de uso interno: contiene nombres de personas reales, así que no publiques
