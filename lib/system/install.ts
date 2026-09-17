@@ -1,4 +1,5 @@
 import { randomInt } from "node:crypto";
+import type { Prisma } from "@prisma/client";
 import { hashPassword } from "@/lib/auth/password";
 import { prisma } from "@/lib/db/prisma";
 import {
@@ -150,7 +151,7 @@ export async function installDatabase(credentials: Map<string, string>): Promise
   }
 
   // bcrypt es costoso a proposito: fuera de la transaccion.
-  const rows = [];
+  const rows: Prisma.MemberCreateManyInput[] = [];
   for (const member of CANONICAL_MEMBERS) {
     const plain = credentials.get(member.slug);
     if (!plain) throw new InstallError(`Falta la contraseña de ${member.slug}.`);
