@@ -3,6 +3,30 @@
 Todas las versiones relevantes de **Elecciones a la Presidencia de la Peñita 2027**.
 Formato basado en Keep a Changelog. Versionado semántico.
 
+## [0.4.0] — 2026-11-09
+
+Rediseño de interfaz, UX/UI y accesibilidad. Sin cambios de lógica, datos ni rutas.
+
+### Cambiado
+- Nuevo sistema de diseño en `app/globals.css`: superficies sólidas para el contenido, cristal solo
+  en cabecera y navegación, escala tipográfica fluida, tokens de movimiento y foco de doble anillo.
+- Movimiento: solo `transform` y `opacity`, curvas ease-out fuertes, feedback `scale(0.97)` al
+  pulsar, hover limitado a punteros precisos y entradas escalonadas en resultados y podio.
+- Navegación inferior con iconos SVG de línea (antes emoji), cabecera con marca y enlace al inicio,
+  sub-navegación de la Junta con desplazamiento horizontal.
+- La cuenta atrás muestra el tramo con un indicador de color y mantiene la cifra en tinta principal
+  (el amarillo no alcanzaba el contraste mínimo).
+
+### Accesibilidad
+- Enlace «Saltar al contenido» y `main` enfocable.
+- Hoja de confirmación: foco atrapado, foco devuelto al cerrar, bloqueo de scroll de fondo y
+  `aria-labelledby`.
+- Selector de miembro: anuncio de número de resultados, sin estilos en línea.
+- Verde de acción oscurecido (`--acento-fuerte`) para texto blanco con contraste AA; texto
+  secundario con 5:1; objetivos táctiles de 44 px como mínimo.
+- Soporte de `prefers-reduced-motion` (se conservan los fundidos), `prefers-contrast`,
+  `prefers-reduced-transparency`, `forced-colors` e impresión.
+
 ## [0.3.0] — 2026-09-16
 
 Puesta en marcha sin línea de comandos.
