@@ -31,13 +31,14 @@ export function LoginForm({ members }: { members: MemberOption[] }) {
             autoComplete="current-password"
             enterKeyHint="go"
             required
+            aria-invalid={state.error ? true : undefined}
             aria-describedby={state.error ? "login-error" : undefined}
           />
           <button
             type="button"
             className="btn btn--fantasma btn--pequeno"
             onClick={() => setVisible((current) => !current)}
-            aria-pressed={visible}
+            aria-controls="password"
           >
             {visible ? "Ocultar" : "Mostrar"}
           </button>

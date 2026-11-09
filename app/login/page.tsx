@@ -35,7 +35,14 @@ export default async function LoginPage() {
     <div className="app-shell">
       <main className="app-main app-main--sin-nav" style={{ justifyContent: "center", minHeight: "100dvh" }}>
         <header className="stack stack--s" style={{ marginBottom: "0.5rem" }}>
-          <p className="texto-secundario">La Peñita</p>
+          <span className="app-header__logo" aria-hidden="true" style={{ width: "3rem", height: "3rem", borderRadius: "1rem" }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m5 13 4 4L19 7" />
+            </svg>
+          </span>
+          <p className="texto-secundario" style={{ fontWeight: 650, letterSpacing: "0.04em", textTransform: "uppercase" }}>
+            La Peñita
+          </p>
           <h1>Elecciones a la Presidencia de la Peñita 2027</h1>
         </header>
 

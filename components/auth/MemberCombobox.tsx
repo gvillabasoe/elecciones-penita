@@ -104,7 +104,8 @@ export function MemberCombobox({ members, value, onChange }: Props) {
         spellCheck={false}
         enterKeyHint="search"
         aria-expanded={open}
-        aria-controls={listId}
+        aria-controls={open ? listId : undefined}
+        aria-haspopup="listbox"
         aria-autocomplete="list"
         aria-activedescendant={open && results[activeIndex] ? `${baseId}-opcion-${activeIndex}` : undefined}
         placeholder={selected ? "Buscar otro nombre" : "Escribe tu nombre o apellido"}
@@ -120,22 +121,20 @@ export function MemberCombobox({ members, value, onChange }: Props) {
 
       <input type="hidden" name="slug" value={value} />
 
+      {/* Anuncia el número de resultados a lectores de pantalla. */}
+      <p className="visualmente-oculto" role="status" aria-live="polite">
+        {open ? (results.length === 0 ? "Sin resultados" : `${results.length} resultados disponibles`) : ""}
+      </p>
+
       {open ? (
         <ul
           id={listId}
           role="listbox"
           aria-label="Miembros de la Peñita"
-          className="stack stack--s"
-          style={{
-            listStyle: "none",
-            margin: "0.25rem 0 0",
-            padding: 0,
-            maxHeight: "16rem",
-            overflowY: "auto"
-          }}
+          className="lista-combo"
         >
           {results.length === 0 ? (
-            <li className="texto-secundario" style={{ padding: "0.5rem 0.25rem" }}>
+            <li className="vacio" role="presentation">
               Ningún nombre coincide con la búsqueda.
             </li>
           ) : (
@@ -147,13 +146,8 @@ export function MemberCombobox({ members, value, onChange }: Props) {
                   role="option"
                   aria-selected={member.slug === value}
                   className="opcion"
-                  style={{
-                    width: "100%",
-                    textAlign: "left",
-                    font: "inherit",
-                    color: "inherit",
-                    background: index === activeIndex ? "rgba(0, 173, 140, 0.08)" : undefined
-                  }}
+                  tabIndex={-1}
+                  data-activa={index === activeIndex ? "true" : "false"}
                   onMouseEnter={() => setActiveIndex(index)}
                   onClick={() => select(member.slug)}
                 >
